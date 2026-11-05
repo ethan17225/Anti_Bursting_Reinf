@@ -31,7 +31,7 @@ export default function Report({ input, result: r, onClose }: { input: DesignInp
   const aci = m.standard === 'ACI_318_19';
 
   return (
-    <div className="report fixed inset-0 z-50 overflow-auto bg-surface print:static print:overflow-visible print:bg-white">
+    <div data-theme="light" className="report fixed inset-0 z-50 overflow-auto bg-surface print:static print:overflow-visible print:bg-white">
       <div className="no-print sticky top-0 flex justify-end gap-2 border-b border-line bg-panel p-2">
         <button className="btn btn-primary" onClick={() => window.print()}><Printer size={14} /> Print / PDF</button>
         <button className="btn" onClick={onClose}><X size={14} /> {t('close')}</button>

@@ -4,32 +4,36 @@ import { Cone, Cylinder, Edges, GizmoHelper, GizmoViewport, Html, Line, OrbitCon
 import type { DesignInput, DesignResult, PileResult, Viewer3DConfig } from '../../core/calculationEngine';
 import { useT, type Key } from '../../i18n';
 import { fmt } from '../../core/format';
+import { capCentre } from '../../core/presets';
 
 /** Structural (x, y, z) in mm, z up -> three.js metres, Y up. */
 const to3D = (x: number, y: number, z: number) => new THREE.Vector3(x * 0.001, z * 0.001, -y * 0.001);
 
 const Y_UP = new THREE.Vector3(0, 1, 0);
-const crushColor = (ur: number) => (ur > 1 ? '#ef4444' : ur > 0.75 ? '#eab308' : '#f97316');
+const AMBER = new THREE.Color('#f59e0b');
+const ORANGE = new THREE.Color('#ea580c');
+const crushColor = (ur: number) => (ur > 1 ? '#ef4444' : `#${AMBER.clone().lerp(ORANGE, Math.max(0, ur)).getHexString()}`);
 
 function XRayMaterial() {
   return <meshPhysicalMaterial color="#94a3b8" transparent opacity={0.16} depthWrite={false} roughness={0.2} />;
 }
 
-function Concrete({ g }: { g: DesignInput['geometry'] }) {
+function Concrete({ g, edge }: { g: DesignInput['geometry']; edge: string }) {
   const m = 0.001;
   const colH = 800;
   const pileL = 1000;
+  const cap = capCentre(g);
   return (
     <group>
-      <mesh position={[0, (g.h * m) / 2, 0]} renderOrder={1}>
+      <mesh position={to3D(cap.x, cap.y, g.h / 2)} renderOrder={1}>
         <boxGeometry args={[g.Lx * m, g.h * m, g.Ly * m]} />
         <XRayMaterial />
-        <Edges threshold={15} color="#334155" />
+        <Edges threshold={15} color={edge} />
       </mesh>
       <mesh position={[0, (g.h + colH / 2) * m, 0]} renderOrder={1}>
         <boxGeometry args={[g.bc * m, colH * m, g.hc * m]} />
         <XRayMaterial />
-        <Edges threshold={15} color="#334155" />
+        <Edges threshold={15} color={edge} />
       </mesh>
       {g.piles.map((p) => (
         <mesh key={p.id} position={to3D(p.x, p.y, -pileL / 2)} renderOrder={1}>
@@ -37,7 +41,7 @@ function Concrete({ g }: { g: DesignInput['geometry'] }) {
             ? <cylinderGeometry args={[(g.Dp * m) / 2, (g.Dp * m) / 2, pileL * m, 32]} />
             : <boxGeometry args={[g.Dp * m, pileL * m, g.Dp * m]} />}
           <XRayMaterial />
-          <Edges threshold={15} color="#334155" />
+          <Edges threshold={15} color={edge} />
         </mesh>
       ))}
     </group>
@@ -124,23 +128,24 @@ function AntiBurstingCage3D({ g, d, r }: { g: DesignInput['geometry']; d: Design
   const rad = (d.barDiameter * 0.001) / 2;
   const spread = (n: number, L: number) => Array.from({ length: n }, (_, j) => (n === 1 ? 0 : -L / 2 + (j * L) / (n - 1)));
   const layers = Array.from({ length: d.numLayers }, (_, k) => r.zBottomLayer + k * r.sv);
+  const cap = capCentre(g);
   return (
-    <group>
+    <group position={to3D(cap.x, cap.y, 0)}>
       {layers.map((zk) => (
         <group key={zk}>
           {spread(d.legsPerLayerX, LY).map((y) => (
             <mesh key={`x${y}`} position={to3D(0, y, zk)} rotation={[0, 0, Math.PI / 2]}>
               <cylinderGeometry args={[rad, rad, LX * 0.001, 8]} />
-              <meshStandardMaterial color="#2563eb" />
+              <meshStandardMaterial color="#3b82f6" />
             </mesh>
           ))}
           {spread(d.legsPerLayerY, LX).map((x) => (
             <mesh key={`y${x}`} position={to3D(x, 0, zk)} rotation={[Math.PI / 2, 0, 0]}>
               <cylinderGeometry args={[rad, rad, LY * 0.001, 8]} />
-              <meshStandardMaterial color="#0891b2" />
+              <meshStandardMaterial color="#06b6d4" />
             </mesh>
           ))}
-          <Line color="#1e3a8a" lineWidth={2}
+          <Line color="#3b82f6" lineWidth={2}
             points={[[-LX / 2, -LY / 2], [LX / 2, -LY / 2], [LX / 2, LY / 2], [-LX / 2, LY / 2], [-LX / 2, -LY / 2]].map(([x, y]) => to3D(x, y, zk))} />
         </group>
       ))}
@@ -178,8 +183,9 @@ const CAMS: Array<[Viewer3DConfig['cameraMode'], Key]> = [
   ['ORTHO_SIDE', 'camSide'],
 ];
 
-export default function PileCapScene3D({ input, result, view, onViewChange, onSelectPile }: {
+export default function PileCapScene3D({ input, result, view, dark, onViewChange, onSelectPile }: {
   input: DesignInput;
+  dark: boolean;
   result: DesignResult;
   view: Viewer3DConfig;
   onViewChange: (v: Viewer3DConfig) => void;
@@ -193,12 +199,12 @@ export default function PileCapScene3D({ input, result, view, onViewChange, onSe
   const span = Math.max(g.Lx, g.Ly, g.h + 1800) * 0.001;
 
   return (
-    <div className="absolute inset-0 bg-[#e9e7e3]">
+    <div className="absolute inset-0 bg-viewport">
       <Canvas onPointerMissed={() => onSelectPile(null)}>
         <Cameras mode={view.cameraMode} span={span} cy={(g.h * 0.001) / 2} />
         <ambientLight intensity={0.8} />
         <directionalLight position={[4, 8, 5]} intensity={1.6} />
-        {view.showConcreteShell && <Concrete g={g} />}
+        {view.showConcreteShell && <Concrete g={g} edge={dark ? '#64748b' : '#334155'} />}
         {view.showRebarCage && <AntiBurstingCage3D g={g} d={input.detailing} r={result} />}
         {active.map((p) => {
           const f = frames.get(p.id)!;
@@ -209,7 +215,7 @@ export default function PileCapScene3D({ input, result, view, onViewChange, onSe
                 <>
                   <BottleStrut3D p={p} frame={f} showBulge={view.showBottleBulge} dimmed={dimmed}
                     selected={view.selectedPileId === p.id} onSelect={() => onSelectPile(p.id)} />
-                  <Line points={[to3D(p.xc, p.yc, g.c), f.end]} color="#334155" lineWidth={3} />
+                  <Line points={[to3D(p.xc, p.yc, g.c), f.end]} color={dark ? '#94a3b8' : '#334155'} lineWidth={3} />
                 </>
               )}
               {view.showBurstingArrows && !dimmed && p.a > 0 && (

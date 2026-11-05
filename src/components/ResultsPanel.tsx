@@ -14,49 +14,61 @@ function Badge({ ok }: { ok: boolean }) {
   );
 }
 
-function Bar({ ur }: { ur: number }) {
+function Bar({ ur, faded }: { ur: number; faded?: boolean }) {
   return (
-    <div className="mt-2 h-1.5 overflow-hidden rounded-sm bg-surface">
-      <div className="h-full transition-[width] duration-300" style={{ width: `${Math.min(ur, 1) * 100}%`, background: urColor(ur) }} />
+    <div className={`mt-1.5 flex items-center gap-2 ${faded ? 'opacity-35' : ''}`}>
+      <div className="h-1.5 flex-1 overflow-hidden rounded-sm bg-surface">
+        <div className="h-full transition-[width] duration-300" style={{ width: `${Math.min(ur, 1) * 100}%`, background: urColor(ur) }} />
+      </div>
+      <span className="w-9 text-right font-mono text-[10px]" style={{ color: urColor(ur) }}>{fmt(ur, 2)}</span>
     </div>
   );
 }
 
-function Check({ title, ok, detail, ur }: { title: string; ok: boolean; detail: string; ur?: number }) {
+function Check({ title, ok, detail, ur, oldUr }: { title: string; ok: boolean; detail: string; ur?: number; oldUr?: number }) {
   return (
-    <div className="card p-2.5">
+    <div className={`card p-2.5 ${ok ? '' : 'glow-bad'}`}>
       <div className="flex items-start justify-between gap-2">
         <span className="text-xs font-medium">{title}</span>
         <Badge ok={ok} />
       </div>
       <p className="mt-1 font-mono text-[11px] text-muted">{detail}</p>
+      {ur !== undefined && oldUr !== undefined && <Bar ur={oldUr} faded />}
       {ur !== undefined && <Bar ur={ur} />}
     </div>
   );
 }
 
-export default function ResultsPanel({ result: r, selectedPileId, onSelectPile, onPrint }: {
+const strutStats = (r: DesignResult) => {
+  const active = r.piles.filter((p) => p.active);
+  return {
+    thetaMin: active.length ? Math.min(...active.map((p) => p.theta)) : 90,
+    crushMax: active.length ? Math.max(...active.map((p) => p.URcrush)) : 0,
+    sigmaMax: active.length ? Math.max(...active.map((p) => p.sigma)) : 0,
+  };
+};
+
+export default function ResultsPanel({ result: r, baseline, selectedPileId, onSelectPile, onPrint }: {
   result: DesignResult;
+  baseline?: DesignResult;
   selectedPileId: number | null;
   onSelectPile: (id: number) => void;
   onPrint: () => void;
 }) {
   const t = useT();
-  const active = r.piles.filter((p) => p.active);
-  const thetaMin = active.length ? Math.min(...active.map((p) => p.theta)) : 90;
-  const crushMax = active.length ? Math.max(...active.map((p) => p.URcrush)) : 0;
-  const sigmaMax = active.length ? Math.max(...active.map((p) => p.sigma)) : 0;
+  const { thetaMin, crushMax, sigmaMax } = strutStats(r);
+  const old = baseline && strutStats(baseline);
 
   return (
     <div>
       <Group title={t('results')}>
         <div className="flex flex-col gap-2">
           <Check title={t('checkTheta')} ok={thetaMin >= 25} detail={`θmin = ${fmt(thetaMin, 2)}° ≥ 25°`} />
-          <Check title={t('checkCrush')} ok={crushMax <= 1} ur={crushMax}
+          <Check title={t('checkCrush')} ok={crushMax <= 1} ur={crushMax} oldUr={old?.crushMax}
             detail={`σc = ${fmt(sigmaMax, 2)} / σRd,max = ${fmt(r.sigmaRdMax, 2)} MPa (${fmt(crushMax * 100, 0)}%)`} />
-          <Check title={t('checkBurstX')} ok={r.URX <= 1} ur={r.URX}
+          <Check title={t('checkBurstX')} ok={r.URX <= 1} ur={r.URX} oldUr={baseline?.URX}
             detail={`As,req ${fmt(r.AsReqX)} / As,prov ${fmt(r.AsProvX)} mm² (${fmt(r.URX * 100)}%)`} />
-          <Check title={t('checkBurstY')} ok={r.URY <= 1} ur={r.URY}
+          <Check title={t('checkBurstY')} ok={r.URY <= 1} ur={r.URY} oldUr={baseline?.URY}
             detail={`As,req ${fmt(r.AsReqY)} / As,prov ${fmt(r.AsProvY)} mm² (${fmt(r.URY * 100)}%)`} />
         </div>
       </Group>

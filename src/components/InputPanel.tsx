@@ -1,7 +1,9 @@
-import type { ReactNode } from 'react';
+import { useContext, type ReactNode } from 'react';
 import type { DesignInput, MaterialInput } from '../core/calculationEngine';
-import { BAR_DIAMETERS, CONCRETE_GRADES, LAYOUTS, LEG_COUNTS, STEEL_GRADES, layoutGeometry, type LayoutId } from '../core/presets';
-import { useT, type Key } from '../i18n';
+import { clearances } from '../core/costOptimizer';
+import { fmt } from '../core/format';
+import { BAR_DIAMETERS, CONCRETE_GRADES, LAYOUTS, LEG_COUNTS, STEEL_GRADES, VN_HIGHRISE_PRESETS, gradeOf, layoutGeometry, type LayoutId } from '../core/presets';
+import { LangContext, useT, type Key } from '../i18n';
 
 const STANDARDS: Array<[MaterialInput['standard'], string]> = [
   ['EC2', 'EC2'],
@@ -44,19 +46,70 @@ function Slider({ label, value, display, min, max, onChange }: { label: string; 
   );
 }
 
-export default function InputPanel({ input, onChange }: { input: DesignInput; onChange: (i: DesignInput) => void }) {
+function VibratorGauge({ input, sv }: { input: DesignInput; sv: number }) {
+  const t = useT();
+  const d = input.detailing;
+  const cl = clearances(input.geometry, d, sv);
+  const v = cl.vertical;
+  const hz = Math.min(cl.x, cl.y);
+  const level = v < 100 || hz < 100 ? 'bad' : v >= 120 && hz >= 150 ? 'ok' : 'tight';
+  const color = { ok: 'var(--color-ok)', tight: 'var(--color-warn)', bad: 'var(--color-bad)' }[level];
+  const fits = (D: number) => Math.min(v, hz) >= D;
+  // One grid cell in section: four bars at the corners of an hz × v clear opening, poker heads centred.
+  const W = Math.min(Math.max(hz, 0), 300) + d.barDiameter;
+  const H = Math.min(Math.max(v, 0), 300) + d.barDiameter;
+  const pad = 45;
+  return (
+    <div className={`card mt-3 p-2.5 ${level === 'bad' ? 'glow-bad' : ''}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium">{t('build')}</span>
+        <span className="text-[11px] font-medium" style={{ color }}>{t(`build_${level}` as Key)}</span>
+      </div>
+      <div className="mt-2 flex items-center gap-3">
+        <svg viewBox={`${-W / 2 - pad} ${-H / 2 - pad} ${W + 2 * pad} ${H + 2 * pad}`} className="h-20 w-28 shrink-0" role="img" aria-label={t('build')}>
+          <rect x={-W / 2} y={-H / 2} width={W} height={H} fill="none" stroke={color} strokeDasharray="6 4" strokeWidth={2} />
+          {[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => (
+            <circle key={`${sx}${sy}`} cx={(sx * W) / 2} cy={(sy * H) / 2} r={d.barDiameter / 2 + 2} fill="var(--p-muted)" />
+          ))}
+          {[70, 50].map((D) => (
+            <circle key={D} r={D / 2} fill="none" strokeWidth={2} stroke={fits(D) ? 'var(--color-ok)' : 'var(--color-bad)'} strokeDasharray={D === 50 ? '4 3' : undefined} />
+          ))}
+        </svg>
+        <p className="font-mono text-[11px] leading-relaxed text-muted">
+          s_clear,v = <span style={{ color: v < 100 ? 'var(--color-bad)' : v < 120 ? 'var(--color-warn)' : 'var(--color-ok)' }}>{fmt(v, 0)}</span> mm<br />
+          s_clear,h = <span style={{ color: hz < 100 ? 'var(--color-bad)' : hz < 150 ? 'var(--color-warn)' : 'var(--color-ok)' }}>{fmt(hz, 0)}</span> mm<br />
+          Ø70 {fits(70) ? '✓' : '✗'} · Ø50 {fits(50) ? '✓' : '✗'}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default function InputPanel({ input, sv, onChange }: { input: DesignInput; sv: number; onChange: (i: DesignInput) => void }) {
   const t = useT();
   const { material, geometry, load, detailing } = input;
   const setMaterial = (m: Partial<DesignInput['material']>) => onChange({ ...input, material: { ...material, ...m } });
   const setGeometry = (g: Partial<DesignInput['geometry']>) => onChange({ ...input, geometry: { ...geometry, ...g } });
   const setLoad = (l: Partial<DesignInput['load']>) => onChange({ ...input, load: { ...load, ...l } });
   const setDetailing = (d: Partial<DesignInput['detailing']>) => onChange({ ...input, detailing: { ...detailing, ...d } });
-  const grade = CONCRETE_GRADES.find((g) => g.fck === material.fck && g.fcd === material.fcd)?.id ?? '';
+  const { lang } = useContext(LangContext);
+  const grade = gradeOf(material.fcd).id;
+  const json = JSON.stringify(input);
+  const vnPreset = VN_HIGHRISE_PRESETS.find((p) => JSON.stringify(p.input) === json);
   const steel = STEEL_GRADES.find((s) => s.fyd === material.fyd)?.id ?? '';
 
   return (
     <div>
-      <Group title={t('presets')}>
+      <Group title={t('vnPreset')}>
+        <select className="input font-sans" value={vnPreset?.id ?? ''} onChange={(e) => {
+          const p = VN_HIGHRISE_PRESETS.find((x) => x.id === e.target.value);
+          if (p) onChange(p.input);
+        }}>
+          {!vnPreset && <option value="">{t('custom')}</option>}
+          {VN_HIGHRISE_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.name[lang]}</option>)}
+        </select>
+        {vnPreset && <p className="mt-1.5 text-[11px] text-muted">{vnPreset.context[lang]}</p>}
+        <p className="label mt-3 mb-1">{t('layouts')}</p>
         <div className="grid grid-cols-2 gap-1.5">
           {LAYOUTS.map((id: LayoutId) => (
             <button key={id} className="btn" onClick={() => setGeometry(layoutGeometry(id, geometry.Dp))}>
@@ -146,6 +199,7 @@ export default function InputPanel({ input, onChange }: { input: DesignInput; on
           <Slider label={t('legsY')} min={0} max={LEG_COUNTS.length - 1} value={LEG_COUNTS.indexOf(detailing.legsPerLayerY)}
             display={detailing.legsPerLayerY} onChange={(i) => setDetailing({ legsPerLayerY: LEG_COUNTS[i] })} />
         </div>
+        <VibratorGauge input={input} sv={sv} />
       </Group>
     </div>
   );

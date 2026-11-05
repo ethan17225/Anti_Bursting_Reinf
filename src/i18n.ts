@@ -70,6 +70,21 @@ const vi = {
   step6: 'Bước 6: Bố trí thép',
   inputs: 'Số liệu đầu vào',
   selfWeightNote: 'Trọng lượng bản thân đài (25 kN/m³) chỉ cộng vào phản lực kiểm tra cọc, không cộng vào thanh chống.',
+  cloud: 'Thiết kế đã lưu',
+  signInHint: 'Nhập email để nhận link đăng nhập. Thiết kế lưu vào tài khoản và mở được trên mọi thiết bị.',
+  email: 'Email',
+  sendLink: 'Gửi link đăng nhập',
+  linkSent: 'Đã gửi link. Mở email và bấm vào link để đăng nhập.',
+  signOut: 'Đăng xuất',
+  designName: 'Tên thiết kế',
+  save: 'Lưu',
+  saveAsNew: 'Lưu thành bản mới',
+  open: 'Mở',
+  delete: 'Xóa',
+  confirmDelete: 'Xóa thiết kế',
+  noDesigns: 'Chưa có thiết kế nào.',
+  untitled: 'Đài cọc mới',
+  badDesign: 'Dữ liệu thiết kế không hợp lệ.',
 };
 
 export type Key = keyof typeof vi;
@@ -144,6 +159,21 @@ const en: Record<Key, string> = {
   step6: 'Step 6: Detailing',
   inputs: 'Inputs',
   selfWeightNote: 'Cap self-weight (25 kN/m³) is added to pile reactions for the pile check only, never to the struts.',
+  cloud: 'Saved designs',
+  signInHint: 'Enter your email to get a sign-in link. Designs are saved to your account and open on any device.',
+  email: 'Email',
+  sendLink: 'Send sign-in link',
+  linkSent: 'Link sent. Open the email and click the link to sign in.',
+  signOut: 'Sign out',
+  designName: 'Design name',
+  save: 'Save',
+  saveAsNew: 'Save as new',
+  open: 'Open',
+  delete: 'Delete',
+  confirmDelete: 'Delete design',
+  noDesigns: 'No saved designs yet.',
+  untitled: 'New pile cap',
+  badDesign: 'This design data is invalid.',
 };
 
 export type Lang = 'vi' | 'en';

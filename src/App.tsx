@@ -1,8 +1,10 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { Box, Languages, PencilRuler } from 'lucide-react';
+import { Box, Cloud, Languages, PencilRuler } from 'lucide-react';
 import { calculate, type DesignInput, type Viewer3DConfig } from './core/calculationEngine';
 import { DEFAULT_INPUT } from './core/presets';
 import { LangContext, useT, type Lang } from './i18n';
+import { supabase } from './lib/supabase';
+import CloudPanel, { type CurrentDesign } from './components/CloudPanel';
 import InputPanel from './components/InputPanel';
 import ResultsPanel from './components/ResultsPanel';
 import Section2D from './components/Section2D';
@@ -44,13 +46,15 @@ function Dashboard() {
   const [view, setView] = useState<Viewer3DConfig>(DEFAULT_VIEW);
   const [tab, setTab] = useState<'3d' | '2d'>('3d');
   const [showReport, setShowReport] = useState(false);
+  const [showCloud, setShowCloud] = useState(false);
+  const [current, setCurrent] = useState<CurrentDesign | null>(null);
   const result = useMemo(() => calculate(input), [input]);
   const selectPile = (id: number | null) => setView((v) => ({ ...v, selectedPileId: v.selectedPileId === id ? null : id }));
 
   return (
     <>
       <div className="no-print flex min-h-full flex-col xl:h-full">
-        <Header />
+        <Header designName={current?.name} onOpenCloud={supabase ? () => setShowCloud(true) : undefined} />
         <main className="grid flex-1 gap-3 p-3 lg:grid-cols-[minmax(320px,1fr)_2fr] xl:min-h-0 xl:grid-cols-[28fr_44fr_28fr]">
           <aside className="card overflow-y-auto xl:min-h-0">
             <InputPanel input={input} onChange={setInput} />
@@ -82,11 +86,15 @@ function Dashboard() {
         </main>
       </div>
       {showReport && <Report input={input} result={result} onClose={() => setShowReport(false)} />}
+      {showCloud && (
+        <CloudPanel input={input} current={current} onSaved={setCurrent} onClose={() => setShowCloud(false)}
+          onLoad={(loaded, design) => { setInput(loaded); setCurrent(design); }} />
+      )}
     </>
   );
 }
 
-function Header() {
+function Header({ designName, onOpenCloud }: { designName?: string; onOpenCloud?: () => void }) {
   const t = useT();
   return (
     <LangContext.Consumer>
@@ -97,6 +105,11 @@ function Header() {
             <p className="text-xs text-muted">{t('appSubtitle')}</p>
           </div>
           <div className="flex items-center gap-1" role="group" aria-label="Language">
+            {onOpenCloud && (
+              <button className="btn mr-2 max-w-64" onClick={onOpenCloud}>
+                <Cloud size={14} /> <span className="truncate">{designName ?? t('cloud')}</span>
+              </button>
+            )}
             <Languages size={16} className="text-muted" />
             {(['vi', 'en'] as const).map((l) => (
               <button key={l} className="btn uppercase" aria-pressed={lang === l} onClick={() => setLang(l)}>

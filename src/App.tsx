@@ -1,5 +1,5 @@
 import { lazy, Suspense, useContext, useEffect, useMemo, useState } from 'react';
-import { Box, Cloud, Languages, Moon, PencilRuler, Sun, Wand2 } from 'lucide-react';
+import { Box, CircleHelp, Cloud, Languages, Moon, PencilRuler, Sun, Wand2 } from 'lucide-react';
 import { calculate, type DesignInput, type Viewer3DConfig } from './core/calculationEngine';
 import { costOf, DEFAULT_VN_COST_RATES, type CostUnitRates, type OptimizationCandidate } from './core/costOptimizer';
 import { fmt, money } from './core/format';
@@ -12,6 +12,7 @@ import InputPanel from './components/InputPanel';
 import ResultsPanel from './components/ResultsPanel';
 import Section2D from './components/Section2D';
 import Report from './components/Report';
+import Tour from './components/Tour';
 
 const PileCapScene3D = lazy(() => import('./components/viewer3d/PileCapScene3D'));
 
@@ -62,6 +63,7 @@ function Dashboard() {
   const [showAutoFix, setShowAutoFix] = useState(false);
   const [rates, setRates] = useState<CostUnitRates>(DEFAULT_VN_COST_RATES);
   const [toast, setToast] = useState<string | null>(null);
+  const [showTour, setShowTour] = useState(false);
   const [current, setCurrent] = useState<CurrentDesign | null>(null);
   const result = useMemo(() => calculate(input), [input]);
   const previewResult = useMemo(() => preview && calculate(preview), [preview]);
@@ -73,6 +75,13 @@ function Dashboard() {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (localStorage.getItem('tourDone')) return;
+    // The tour measures its targets when it opens, so wait until the dashboard is on screen.
+    const id = setTimeout(() => setShowTour(true), 400);
+    return () => clearTimeout(id);
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -109,6 +118,17 @@ function Dashboard() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const startTour = () => {
+    setShowAutoFix(false);
+    setPreview(null);
+    setTab('3d');
+    setShowTour(true);
+  };
+  const endTour = () => {
+    localStorage.setItem('tourDone', '1');
+    setShowTour(false);
+  };
+
   const apply = (c: OptimizationCandidate) => {
     const before = costOf(input, result, rates);
     const after = costOf(c.input, calculate(c.input), rates);
@@ -123,7 +143,7 @@ function Dashboard() {
     <>
       <div className="no-print flex min-h-full flex-col xl:h-full">
         <Header designName={current?.name} theme={theme} onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          onAutoFix={() => setShowAutoFix((s) => !s)} autoFixOpen={showAutoFix}
+          onAutoFix={() => setShowAutoFix((s) => !s)} autoFixOpen={showAutoFix} onTour={startTour}
           onOpenCloud={supabase ? () => setShowCloud(true) : undefined} />
         <main className="grid flex-1 gap-3 p-3 lg:grid-cols-[minmax(320px,1fr)_2fr] xl:min-h-0 xl:grid-cols-[28fr_44fr_28fr]">
           <aside className="card overflow-y-auto xl:min-h-0">
@@ -135,7 +155,7 @@ function Dashboard() {
             )}
           </aside>
           <section className="card flex min-h-[560px] flex-col overflow-hidden xl:min-h-0">
-            <div className="flex gap-1 border-b border-line p-2">
+            <div data-tour="tabs" className="flex gap-1 border-b border-line p-2">
               <button className="btn" aria-pressed={tab === '3d'} onClick={() => setTab('3d')}>
                 <Box size={14} /> {t('tab3d')}
               </button>
@@ -143,7 +163,7 @@ function Dashboard() {
                 <PencilRuler size={14} /> {t('tab2d')}
               </button>
             </div>
-            <div className="relative min-h-0 flex-1">
+            <div data-tour="viewer" className="relative min-h-0 flex-1">
               {tab === '3d' ? (
                 <Suspense fallback={null}>
                   <PileCapScene3D input={shown} result={shownResult} view={view} dark={theme === 'dark'} onViewChange={setView} onSelectPile={selectPile} />
@@ -172,6 +192,7 @@ function Dashboard() {
           {toast}
         </div>
       )}
+      {showTour && <Tour onClose={endTour} />}
       {showReport && <Report input={input} result={result} onClose={() => setShowReport(false)} />}
       {showCloud && (
         <CloudPanel input={input} current={current} onSaved={setCurrent} onClose={() => setShowCloud(false)}
@@ -194,7 +215,7 @@ function StatusBar() {
   const t = useT();
   const label = (k: string) => (k.startsWith('hk') ? t(k as Key) : k);
   return (
-    <footer className="hidden flex-wrap gap-x-4 gap-y-1 border-t border-line bg-panel px-4 py-1.5 text-[11px] text-muted md:flex">
+    <footer data-tour="hotkeys" className="hidden flex-wrap gap-x-4 gap-y-1 border-t border-line bg-panel px-4 py-1.5 text-[11px] text-muted md:flex">
       {HOTKEYS.map(([keys, k]) => (
         <span key={keys} className="inline-flex items-center gap-1">
           {keys.split(' ').map((key) => <kbd key={key}>{key}</kbd>)} {label(k)}
@@ -204,12 +225,13 @@ function StatusBar() {
   );
 }
 
-function Header({ designName, theme, onToggleTheme, onAutoFix, autoFixOpen, onOpenCloud }: {
+function Header({ designName, theme, onToggleTheme, onAutoFix, autoFixOpen, onTour, onOpenCloud }: {
   designName?: string;
   theme: Theme;
   onToggleTheme: () => void;
   onAutoFix: () => void;
   autoFixOpen: boolean;
+  onTour: () => void;
   onOpenCloud?: () => void;
 }) {
   const t = useT();
@@ -221,23 +243,28 @@ function Header({ designName, theme, onToggleTheme, onAutoFix, autoFixOpen, onOp
         <p className="truncate text-xs text-muted">{t('appSubtitle')}</p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <button className="btn btn-primary mr-1" aria-pressed={autoFixOpen} onClick={onAutoFix}>
+        <button data-tour="autofix" className="btn btn-primary mr-1" aria-pressed={autoFixOpen} onClick={onAutoFix}>
           <Wand2 size={14} /> {t('autoFix')} <kbd>A</kbd>
         </button>
         {onOpenCloud && (
-          <button className="btn mr-1 max-w-64" onClick={onOpenCloud}>
+          <button data-tour="cloud" className="btn mr-1 max-w-64" onClick={onOpenCloud}>
             <Cloud size={14} /> <span className="truncate">{designName ?? t('cloud')}</span>
           </button>
         )}
-        <button className="btn mr-1" onClick={onToggleTheme} aria-label={t('theme')} title={t('theme')}>
-          {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-        </button>
-        <Languages size={16} className="text-muted" />
-        {(['vi', 'en'] as const).map((l) => (
-          <button key={l} className="btn uppercase" aria-pressed={lang === l} onClick={() => setLang(l)}>
-            {l}
+        <div data-tour="prefs" className="flex items-center gap-1">
+          <button className="btn" onClick={onTour} aria-label={t('tourReplay')} title={t('tourReplay')}>
+            <CircleHelp size={14} />
           </button>
-        ))}
+          <button className="btn mr-1" onClick={onToggleTheme} aria-label={t('theme')} title={t('theme')}>
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
+          <Languages size={16} className="text-muted" />
+          {(['vi', 'en'] as const).map((l) => (
+            <button key={l} className="btn uppercase" aria-pressed={lang === l} onClick={() => setLang(l)}>
+              {l}
+            </button>
+          ))}
+        </div>
       </div>
     </header>
   );

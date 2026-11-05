@@ -61,7 +61,7 @@ export default function ResultsPanel({ result: r, baseline, selectedPileId, onSe
 
   return (
     <div>
-      <Group title={t('results')}>
+      <Group title={t('results')} tour="results">
         <div className="flex flex-col gap-2">
           <Check title={t('checkTheta')} ok={thetaMin >= 25} detail={`θmin = ${fmt(thetaMin, 2)}° ≥ 25°`} />
           <Check title={t('checkCrush')} ok={crushMax <= 1} ur={crushMax} oldUr={old?.crushMax}
@@ -119,7 +119,7 @@ export default function ResultsPanel({ result: r, baseline, selectedPileId, onSe
       </Group>
 
       <div className="p-3">
-        <button className="btn btn-primary w-full py-2" onClick={onPrint}>
+        <button data-tour="print" className="btn btn-primary w-full py-2" onClick={onPrint}>
           <Printer size={14} /> {t('print')}
         </button>
       </div>

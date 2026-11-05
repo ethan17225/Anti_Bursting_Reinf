@@ -11,9 +11,9 @@ const STANDARDS: Array<[MaterialInput['standard'], string]> = [
   ['ACI_318_19', 'ACI 318-19'],
 ];
 
-export function Group({ title, children }: { title: string; children: ReactNode }) {
+export function Group({ title, tour, children }: { title: string; tour?: string; children: ReactNode }) {
   return (
-    <section className="border-b border-line p-3 last:border-b-0">
+    <section data-tour={tour} className="border-b border-line p-3 last:border-b-0">
       <h2 className="label mb-2">{title}</h2>
       {children}
     </section>
@@ -100,7 +100,7 @@ export default function InputPanel({ input, sv, onChange }: { input: DesignInput
 
   return (
     <div>
-      <Group title={t('vnPreset')}>
+      <Group title={t('vnPreset')} tour="presets">
         <select className="input font-sans" value={vnPreset?.id ?? ''} onChange={(e) => {
           const p = VN_HIGHRISE_PRESETS.find((x) => x.id === e.target.value);
           if (p) onChange(p.input);
@@ -119,7 +119,7 @@ export default function InputPanel({ input, sv, onChange }: { input: DesignInput
         </div>
       </Group>
 
-      <Group title={t('material')}>
+      <Group title={t('material')} tour="inputs">
         <div className="grid grid-cols-3 gap-2">
           <label className="field">
             {t('standard')}
@@ -188,7 +188,7 @@ export default function InputPanel({ input, sv, onChange }: { input: DesignInput
         </label>
       </Group>
 
-      <Group title={t('detailing')}>
+      <Group title={t('detailing')} tour="detailing">
         <div className="flex flex-col gap-3">
           <Slider label={t('barDiameter')} min={0} max={BAR_DIAMETERS.length - 1} value={BAR_DIAMETERS.indexOf(detailing.barDiameter)}
             display={`φ${detailing.barDiameter}`} onChange={(i) => setDetailing({ barDiameter: BAR_DIAMETERS[i] })} />

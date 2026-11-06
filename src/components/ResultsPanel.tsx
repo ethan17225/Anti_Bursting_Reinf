@@ -1,7 +1,10 @@
+import type { ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Printer, XCircle } from 'lucide-react';
-import type { DesignResult } from '../core/calculationEngine';
+import type { DesignInput, DesignResult } from '../core/calculationEngine';
+import type { FormulaId } from '../core/formulas';
 import { useT, type Key } from '../i18n';
 import { fmt, urColor } from '../core/format';
+import FormulaButton from './FormulaButton';
 import { Group } from './InputPanel';
 
 function Badge({ ok }: { ok: boolean }) {
@@ -25,11 +28,11 @@ function Bar({ ur, faded }: { ur: number; faded?: boolean }) {
   );
 }
 
-function Check({ title, ok, detail, ur, oldUr }: { title: string; ok: boolean; detail: string; ur?: number; oldUr?: number }) {
+function Check({ title, formula, ok, detail, ur, oldUr }: { title: string; formula?: ReactNode; ok: boolean; detail: string; ur?: number; oldUr?: number }) {
   return (
     <div className={`card p-2.5 ${ok ? '' : 'glow-bad'}`}>
       <div className="flex items-start justify-between gap-2">
-        <span className="text-xs font-medium">{title}</span>
+        <span className="inline-flex items-center gap-1 text-xs font-medium">{title}{formula}</span>
         <Badge ok={ok} />
       </div>
       <p className="mt-1 font-mono text-[11px] text-muted">{detail}</p>
@@ -48,7 +51,12 @@ const strutStats = (r: DesignResult) => {
   };
 };
 
-export default function ResultsPanel({ result: r, baseline, selectedPileId, onSelectPile, onPrint }: {
+const COLS: Array<[string, FormulaId | null]> = [
+  ['', null], ['R kN', 'R'], ['a mm', 'a'], ['θ°', 'theta'], ['Fc kN', 'Fc'], ['T⊥ kN', 'Tperp'], ['Tx kN', 'Tx'], ['Ty kN', 'Ty'],
+];
+
+export default function ResultsPanel({ input, result: r, baseline, selectedPileId, onSelectPile, onPrint }: {
+  input: DesignInput;
   result: DesignResult;
   baseline?: DesignResult;
   selectedPileId: number | null;
@@ -58,17 +66,22 @@ export default function ResultsPanel({ result: r, baseline, selectedPileId, onSe
   const t = useT();
   const { thetaMin, crushMax, sigmaMax } = strutStats(r);
   const old = baseline && strutStats(baseline);
+  const active = r.piles.filter((p) => p.active);
+  const thetaPile = active.reduce((a, p) => (p.theta < a.theta ? p : a), active[0]);
+  const crushPile = active.reduce((a, p) => (p.URcrush > a.URcrush ? p : a), active[0]);
+  const shown = r.piles.find((p) => p.id === selectedPileId) ?? active[0] ?? r.piles[0];
+  const f = (id: FormulaId, pileId?: number) => <FormulaButton input={input} result={r} id={id} pileId={pileId} />;
 
   return (
     <div>
       <Group title={t('results')} tour="results">
         <div className="flex flex-col gap-2">
-          <Check title={t('checkTheta')} ok={thetaMin >= 25} detail={`θmin = ${fmt(thetaMin, 2)}° ≥ 25°`} />
-          <Check title={t('checkCrush')} ok={crushMax <= 1} ur={crushMax} oldUr={old?.crushMax}
+          <Check title={t('checkTheta')} formula={thetaPile && f('theta', thetaPile.id)} ok={thetaMin >= 25} detail={`θmin = ${fmt(thetaMin, 2)}° ≥ 25°`} />
+          <Check title={t('checkCrush')} formula={crushPile && f('crush', crushPile.id)} ok={crushMax <= 1} ur={crushMax} oldUr={old?.crushMax}
             detail={`σc = ${fmt(sigmaMax, 2)} / σRd,max = ${fmt(r.sigmaRdMax, 2)} MPa (${fmt(crushMax * 100, 0)}%)`} />
-          <Check title={t('checkBurstX')} ok={r.URX <= 1} ur={r.URX} oldUr={baseline?.URX}
+          <Check title={t('checkBurstX')} formula={f('burstX')} ok={r.URX <= 1} ur={r.URX} oldUr={baseline?.URX}
             detail={`As,req ${fmt(r.AsReqX)} / As,prov ${fmt(r.AsProvX)} mm² (${fmt(r.URX * 100)}%)`} />
-          <Check title={t('checkBurstY')} ok={r.URY <= 1} ur={r.URY} oldUr={baseline?.URY}
+          <Check title={t('checkBurstY')} formula={f('burstY')} ok={r.URY <= 1} ur={r.URY} oldUr={baseline?.URY}
             detail={`As,req ${fmt(r.AsReqY)} / As,prov ${fmt(r.AsProvY)} mm² (${fmt(r.URY * 100)}%)`} />
         </div>
       </Group>
@@ -91,8 +104,10 @@ export default function ResultsPanel({ result: r, baseline, selectedPileId, onSe
           <table className="w-full font-mono text-[11px]">
             <thead className="text-muted">
               <tr className="text-right">
-                {['', 'R kN', 'a mm', 'θ°', 'Fc kN', 'T⊥ kN', 'Tx kN', 'Ty kN'].map((h) => (
-                  <th key={h} className="px-1 py-1 font-normal first:text-left">{h}</th>
+                {COLS.map(([label, id]) => (
+                  <th key={label} className="px-1 py-1 font-normal first:text-left">
+                    <span className="inline-flex items-center gap-0.5 first:justify-start">{label}{id && shown && f(id, shown.id)}</span>
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -113,8 +128,11 @@ export default function ResultsPanel({ result: r, baseline, selectedPileId, onSe
             </tbody>
           </table>
         </div>
-        <p className="mt-2 font-mono text-[11px] text-muted">
-          d = {fmt(r.d, 0)} · z = {fmt(r.z)} · T,X = {fmt(r.TdesignX)} kN · T,Y = {fmt(r.TdesignY)} kN
+        <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-muted">
+          <span className="inline-flex items-center gap-0.5">d = {fmt(r.d, 0)} {f('d')}</span>
+          <span className="inline-flex items-center gap-0.5">z = {fmt(r.z)} {f('z')}</span>
+          <span className="inline-flex items-center gap-0.5">T,X = {fmt(r.TdesignX)} kN {f('TdesignX')}</span>
+          <span className="inline-flex items-center gap-0.5">T,Y = {fmt(r.TdesignY)} kN {f('TdesignY')}</span>
         </p>
       </Group>
 

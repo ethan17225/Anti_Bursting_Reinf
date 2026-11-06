@@ -48,7 +48,7 @@ export interface OptimizationCandidate {
 }
 
 const STEEL_DENSITY = 7850; // kg/m3
-const C_SIDE = 75; // mm
+export const C_SIDE = 75; // mm, side cover used for the anti-bursting cage
 export const LIMITS = { thetaMin: 26.5, urMax: 0.98, svMin: 110, svMax: 280, clearMin: 100 };
 const PRICE_GRADES: GradeId[] = ['B30', 'B35', 'B40', 'B45'];
 export const H_SEARCH_UP = 2000; // mm above the current depth the global search may go

@@ -151,7 +151,7 @@ function Dashboard() {
               <AutoFixPanel input={input} rates={rates} onRatesChange={setRates} onPreview={setPreview} onApply={apply}
                 onClose={() => { setShowAutoFix(false); setPreview(null); }} />
             ) : (
-              <InputPanel input={input} sv={result.sv} onChange={setInput} />
+              <InputPanel input={input} result={result} onChange={setInput} />
             )}
           </aside>
           <section className="card flex min-h-[560px] flex-col overflow-hidden xl:min-h-0">
@@ -181,7 +181,7 @@ function Dashboard() {
             </div>
           </section>
           <aside className="card overflow-y-auto lg:col-span-2 xl:col-span-1 xl:min-h-0">
-            <ResultsPanel result={shownResult} baseline={previewResult ? result : undefined} selectedPileId={view.selectedPileId}
+            <ResultsPanel input={shown} result={shownResult} baseline={previewResult ? result : undefined} selectedPileId={view.selectedPileId}
               onSelectPile={selectPile} onPrint={() => setShowReport(true)} />
           </aside>
         </main>

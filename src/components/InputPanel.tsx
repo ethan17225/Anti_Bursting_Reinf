@@ -1,9 +1,10 @@
 import { useContext, type ReactNode } from 'react';
-import type { DesignInput, MaterialInput } from '../core/calculationEngine';
+import type { DesignInput, DesignResult, MaterialInput } from '../core/calculationEngine';
 import { clearances } from '../core/costOptimizer';
 import { fmt } from '../core/format';
 import { BAR_DIAMETERS, CONCRETE_GRADES, LAYOUTS, LEG_COUNTS, STEEL_GRADES, VN_HIGHRISE_PRESETS, gradeOf, layoutGeometry, type LayoutId } from '../core/presets';
 import { LangContext, useT, type Key } from '../i18n';
+import FormulaButton from './FormulaButton';
 
 const STANDARDS: Array<[MaterialInput['standard'], string]> = [
   ['EC2', 'EC2'],
@@ -46,10 +47,10 @@ function Slider({ label, value, display, min, max, onChange }: { label: string; 
   );
 }
 
-function VibratorGauge({ input, sv }: { input: DesignInput; sv: number }) {
+function VibratorGauge({ input, result }: { input: DesignInput; result: DesignResult }) {
   const t = useT();
   const d = input.detailing;
-  const cl = clearances(input.geometry, d, sv);
+  const cl = clearances(input.geometry, d, result.sv);
   const v = cl.vertical;
   const hz = Math.min(cl.x, cl.y);
   const level = v < 100 || hz < 100 ? 'bad' : v >= 120 && hz >= 150 ? 'ok' : 'tight';
@@ -62,7 +63,7 @@ function VibratorGauge({ input, sv }: { input: DesignInput; sv: number }) {
   return (
     <div className={`card mt-3 p-2.5 ${level === 'bad' ? 'glow-bad' : ''}`}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium">{t('build')}</span>
+        <span className="inline-flex items-center gap-1 text-xs font-medium">{t('build')}<FormulaButton input={input} result={result} id="clear" /></span>
         <span className="text-[11px] font-medium" style={{ color }}>{t(`build_${level}` as Key)}</span>
       </div>
       <div className="mt-2 flex items-center gap-3">
@@ -85,7 +86,7 @@ function VibratorGauge({ input, sv }: { input: DesignInput; sv: number }) {
   );
 }
 
-export default function InputPanel({ input, sv, onChange }: { input: DesignInput; sv: number; onChange: (i: DesignInput) => void }) {
+export default function InputPanel({ input, result, onChange }: { input: DesignInput; result: DesignResult; onChange: (i: DesignInput) => void }) {
   const t = useT();
   const { material, geometry, load, detailing } = input;
   const setMaterial = (m: Partial<DesignInput['material']>) => onChange({ ...input, material: { ...material, ...m } });
@@ -199,7 +200,7 @@ export default function InputPanel({ input, sv, onChange }: { input: DesignInput
           <Slider label={t('legsY')} min={0} max={LEG_COUNTS.length - 1} value={LEG_COUNTS.indexOf(detailing.legsPerLayerY)}
             display={detailing.legsPerLayerY} onChange={(i) => setDetailing({ legsPerLayerY: LEG_COUNTS[i] })} />
         </div>
-        <VibratorGauge input={input} sv={sv} />
+        <VibratorGauge input={input} result={result} />
       </Group>
     </div>
   );
